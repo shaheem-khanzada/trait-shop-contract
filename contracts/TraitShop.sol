@@ -8,6 +8,8 @@ import "./Interfaces/ApesTraitsInterface.sol";
 contract TraitShop is Ownable, ReentrancyGuard {
     mapping(address => uint256) private _ethBalances;
     address[] public whiteListedTokens;
+    mapping(address => bool) public isTokenWhitelisted;
+    mapping(address => bool) public isAdmin;
 
     mapping(address => mapping(address => uint256)) private _tokenBalances;
 
@@ -27,28 +29,24 @@ contract TraitShop is Ownable, ReentrancyGuard {
         secret = _secret;
     }
 
+    function setAdmins(address[] memory admins) external {
+     for (uint i = 0; i < admins.length; i++) {
+            isAdmin[admins[i]] = true;
+        }
+    }
+
     function setWhiteListedTokensAddress(
         address[] memory tokenAddress
     ) public onlyOwner {
         for (uint i = 0; i < tokenAddress.length; i++) {
             whiteListedTokens.push(tokenAddress[i]);
+            isTokenWhitelisted[tokenAddress[i]] = true;
         }
-    }
-
-    function isTokenWhitelisted(
-        address tokenAddress
-    ) public view returns (bool) {
-        for (uint i = 0; i < whiteListedTokens.length; i++) {
-            if (whiteListedTokens[i] == tokenAddress) {
-                return true;
-            }
-        }
-        return false;
     }
 
     modifier onlyWhitelistedToken(address tokenAddress) {
         require(
-            isTokenWhitelisted(tokenAddress),
+            isTokenWhitelisted[tokenAddress],
             "TraitShop: Token address is not whitelisted."
         );
         _;
@@ -57,12 +55,12 @@ contract TraitShop is Ownable, ReentrancyGuard {
     function buyTraitWithETH(
         uint256 traitId,
         address sponsorAddress,
-        uint256 commissionPercentage,
         uint256 quantity,
         uint256 price,
+        uint commissionPercentage,
         bool buyOnChain,
         bytes memory signature
-    ) public payable nonReentrant {
+    ) external payable nonReentrant {
         require(
             _verifyHashSignature(
                 keccak256(
@@ -72,7 +70,6 @@ contract TraitShop is Ownable, ReentrancyGuard {
                         commissionPercentage,
                         quantity,
                         price,
-                        buyOnChain,
                         msg.sender
                     )
                 ),
@@ -98,13 +95,13 @@ contract TraitShop is Ownable, ReentrancyGuard {
     function buyTraitWithERC20(
         uint256 traitId,
         address sponsorAddress,
-        uint256 commissionPercentage,
         uint256 quantity,
         uint256 price,
         address erc20TokenAddress,
+        uint commissionPercentage,
         bool buyOnChain,
         bytes memory signature
-    ) public onlyWhitelistedToken(erc20TokenAddress) nonReentrant {
+    ) external onlyWhitelistedToken(erc20TokenAddress) nonReentrant {
         require(
             _verifyHashSignature(
                 keccak256(
@@ -115,7 +112,6 @@ contract TraitShop is Ownable, ReentrancyGuard {
                         quantity,
                         price,
                         erc20TokenAddress,
-                        buyOnChain,
                         msg.sender
                     )
                 ),
@@ -142,7 +138,7 @@ contract TraitShop is Ownable, ReentrancyGuard {
         emit TraitBought(msg.sender, traitId, price, quantity, buyOnChain);
     }
 
-    function withdrawAll() public {
+    function withdrawAll() external {
         uint256 ethBalance = _ethBalances[msg.sender];
 
         if (ethBalance > 0) {
@@ -161,14 +157,14 @@ contract TraitShop is Ownable, ReentrancyGuard {
         }
     }
 
-    function getEthBalance(address account) public view returns (uint256) {
+    function getEthBalance(address account) external view returns (uint256) {
         return _ethBalances[account];
     }
 
     function getTokenBalance(
         address account,
         address token
-    ) public view returns (uint256) {
+    ) external view returns (uint256) {
         return _tokenBalances[account][token];
     }
 
